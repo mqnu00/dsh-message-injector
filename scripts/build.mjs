@@ -1,6 +1,6 @@
 /**
  * 构建插件两端（产物提交在 lib/，安装即用，无需用户构建）：
- *   1. 后端：src/host/index.ts    → lib/index.js   （ESM；schemastery/dsh-settings 保持外部解析）
+ *   1. 后端：src/host/index.ts    → lib/index.js   （ESM；schemastery/yaml 保持外部解析）
  *   2. 前端：src/client/index.tsx → lib/client.js （__ModuleLoader__.load 形态，浏览器端标准格式）
  *
  * 目录约定：src/ 按官方 half 分法分 host（后端）/ client（前端）两个目录。
@@ -16,7 +16,7 @@ const host = await build({
   format: 'esm',
   platform: 'node',
   target: 'node20',
-  external: ['@deepseek-ai/schemastery', '@deepseek-ai/dsh-settings'],
+  external: ['@deepseek-ai/schemastery', 'yaml'],
   write: false,
   logLevel: 'info',
 })

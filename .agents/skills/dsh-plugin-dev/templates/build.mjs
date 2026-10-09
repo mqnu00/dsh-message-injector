@@ -1,6 +1,6 @@
 /**
  * 构建插件两端（产物提交在 lib/，安装即用，无需用户构建）：
- *   1. 后端：src/host/index.ts    → lib/index.js   （ESM；schemastery/dsh-settings 保持外部解析）
+ *   1. 后端：src/host/index.ts    → lib/index.js   （ESM；schemastery 等保持外部解析）
  *   2. 前端：src/client/index.tsx → lib/client.js （__ModuleLoader__.load 形态，浏览器端标准格式）
  *
  * 用法：pnpm build
@@ -15,7 +15,7 @@ const host = await build({
   format: 'esm',
   platform: 'node',
   target: 'node20',
-  external: ['@deepseek-ai/schemastery', '@deepseek-ai/dsh-settings'],
+  external: ['@deepseek-ai/schemastery'],
   write: false,
   logLevel: 'info',
 })

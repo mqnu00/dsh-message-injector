@@ -6,6 +6,38 @@
 
 （暂无）
 
+## [0.2.0] - 2026-10-09
+
+适配 dsh 0.2.0（settings 架构重构，破坏性变更）。dsh 0.1.x 请继续使用 [0.1.0]。
+
+### Changed（Breaking）
+
+- **宿主半全面迁移到 0.2.0 settings 模型**（旧 API 已被官方删除，插件在原版本必然崩溃）：
+  - 命名空间由自定义字符串改为 **Loader 条目 id**（= 包名 `dsh-message-injector`）
+  - `Config` 的 `groups`/`selected` 声明为 `.volatile()`；`apply(ctx, config)` 经 `config.<字段>.get()` 读实时值
+  - 移除 `installSettingsSection`/`settingsNamespace`（`@deepseek-ai/dsh-settings` 依赖随之移除）
+  - 自动反选（F6-6）迁移：不能在 `loader/volatile-update` 回调内回写配置（HMR 事务嵌套必被拒）→ 改为前端配置卡保存时与 `groups` 同一次 mutate 原子清理 `selected`，消费侧（选择器/注入）对失效选中另有守卫
+  - 自绘配置卡声明 `settings.configure({ auto: false })`，避免官方再生成一份设置页
+  - 保存时的硬校验（组名唯一/内容非空）不再有官方 `validate` 钩子——由前端配置卡保存前拦截 + 后端容错消费
+- **前端迁移到 0.2.0 客户端服务**：
+  - `settingsScope` → `ctx.configForms.get(条目id)`（ConfigForm 稳定快照 + subscribe + set；`set` 返回是否被接受，只读/被拒绝时为 `false`）
+  - 配置卡挂载点 `settings.plugin.item`（已删除）→ `plugins.bundle.config`（Plugins 页 bundle 详情，key = 包名），并用 `configForms.whileServed` 门控
+  - 「设置直达」改为官方导航服务 `ctx.pluginNavigation.openBundle(包名)`（降级：`layout.selectPanel('plugins')` → DOM 兜底）
+  - 技能目录 `connection.api.skills` → `ctx.remote.skills.list`（RemoteResult 包装）
+  - 当前会话定位：`sessions.list.getSnapshot().current`（已删除）→ 按 `retainedBy.mainView > 0` 查找
+- **package.json**：新增 `peerDependencies`（`@deepseek-ai/dsh >=0.2.0-rc.0 <0.3.0-0`、cordis `^4.0.4`）与 `engines` 版本门禁；`dsh.client.inject` 改为包名清单；`dsh-settings` 依赖移除，`schemastery` 升至 `^3.18.4`，新增 `yaml`
+- **构建配置**：新增 `pnpm-workspace.yaml`（`autoInstallPeers: false` 与 dsh profile 对齐，避免本地安装把整个 dsh 拉成依赖）
+
+### Added
+
+- **旧数据一次性导入**：启动后读取 `$DSH_HOME/settings.yaml(.imported)` 的 `message-injector` 段落写入新条目（仅在未配置时执行，绝不覆盖升级后的修改）
+- 配置卡只读态提示（非本机访问等 memory 模式）与保存「未被接受」提示文案
+
+### Docs
+
+- 全部文档同步 0.2.0：安装/使用说明/架构/迭代记录/开发经验；README 更新存储位置（profile `cordis.patch.yml`）与版本对应关系
+- `.agents/skills/dsh-plugin-dev` 开发手册与模板同步 0.2.0 API
+
 ## [0.1.0] - 2026-08-30
 
 首个开源版本。

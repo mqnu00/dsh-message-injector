@@ -23,14 +23,14 @@ declare module 'react/jsx-runtime' {
 }
 
 declare module '@deepseek-ai/dsh-client-ui-primitives' {
-  /** 通用下拉菜单（PermissionSelect 同款） */
+  /** 通用下拉菜单（PermissionSelect 同款；portal 模式渲染到 body） */
   export const Menu: any
-  /** 图标（按 名称+尺寸 命名） */
-  export const IconSkillOutline16: any
-  export const IconChevronDownOutline14: any
-  export const IconChevronUpOutline14: any
-  export const IconTrashOutline16: any
-  export const IconSettingsOutline16: any
+  /** 图标（0.2.0 命名：名称 + Outline + Regular/Medium） */
+  export const IconSkillOutlineRegular: any
+  export const IconChevronDownOutlineRegular: any
+  export const IconChevronUpOutlineRegular: any
+  export const IconTrashOutlineRegular: any
+  export const IconSettingsOutlineRegular: any
 }
 
 declare namespace JSX {

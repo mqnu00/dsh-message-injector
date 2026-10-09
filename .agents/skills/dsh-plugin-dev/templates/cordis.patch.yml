@@ -1,6 +1,7 @@
 # 组合包激活补丁（bundle 层）
 # 由 dsh plugin add 依据 package.json 的 dsh.bundle.patch 自动挂载为 profile 层；
 # name 只用包名（Node 模块解析），绝不写绝对路径。
+# 注意：insert 的 id 就是 dsh 0.2.0 的 settings 命名空间（前端 configForms 也按它寻址）——起名后别再改。
 - insert:
     - id: dsh-hello-plugin
       name: dsh-hello-plugin

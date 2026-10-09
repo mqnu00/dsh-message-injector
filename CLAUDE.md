@@ -23,43 +23,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **预设组**：多套常用的注入内容组合（任意文本 / 技能调用），可切换使用
 - **预设选择器**：放在输入框左下角（权限选择器旁），UI 样式与之一致
-- **管理入口**：在 dsh 的 设置 → 插件 → 插件配置 中完成预设组的增删改查、启用/禁用
+- **管理入口**：在 dsh 侧边栏「插件（Plugins）」页 → 本插件详情中完成预设组的增删改查、启用/禁用（dsh 0.2.0 官方位置；0.1.x 为 设置 → 插件 → 插件配置）
 - **自动注入**：选中后每条消息自动把内容注入输入框首行（空输入框才注入，绝不触碰已有内容）
 - 点击选择器可看到已启用的预设组
 
-## 插件开发框架（Cordis）
+## 插件开发框架（Cordis / dsh 0.2.0）
 
 dsh 插件基于 Cordis 框架，官方教程：https://deepseek-harness.github.io/deepseek-harness/develop/basic/（亦见 `docs/zh/架构.md`）
 
-- 插件根目录的 `cordis.yml` 是本地插件加载配置（覆盖层），通过 `insert` 引入插件入口文件的**绝对路径**，例如：
-  ```yaml
-  - insert:
-      - id: hello
-        name: '/absolute/path/to/.../src/index.ts'
-  ```
-- 插件入口是导出 `apply(ctx: Context)` 的 TS 模块，三种形态：函数形式（`export const name` + `export function apply`）、对象形式（`export default { name, inject, apply }`）、类形式（`extends Service`，向其他插件提供服务）
-- 依赖服务通过 `inject` 声明（如 `['tools']`），框架保证依赖就绪后才加载插件
-- 通过 `ctx` 注册的资源在插件卸载时自动清理；需要手动清理的资源用 `ctx.effect()`
+- 插件入口是导出 `apply(ctx: Context, config?)` 的 TS 模块；本插件用函数形式（`export const name` + `export const Config` + `export function apply`）
+- **dsh 0.2.0 配置模型**：命名空间 = Loader 条目 id（patch 的 insert id = 包名）；导出 `Config`（schemastery），参与配置卡/持久化的字段必须 `.volatile()`；`apply(ctx, config)` 里经 `config.<字段>.get()` 读实时值；写入走官方 settings 服务（前端 `ctx.configForms`，后端 `ctx.get('settings')`）
+- **小心 HMR 写事务**：`loader/volatile-update` 在写事务内触发，回调里不能再 `settings.update`（嵌套必拒）——需要"改配置顺带改配置"时放进同一次 `mutate`
+- 依赖服务通过 `export const inject` 声明（如 `['slots', 'locale', 'configForms', 'remote', 'remote.skills']`），框架保证依赖就绪后才加载插件
+- 通过 `ctx` 注册的资源在插件卸载时自动清理；需要手动清理的资源用 `ctx.effect()`（回调必须返回 disposer）
 - 插件测试统一走官方安装/卸载：`dsh plugin --profile web add|remove <package>`（本仓库不提供 `--patch` 覆盖层配置）
 
 ## 目录结构
 
 ```
 dsh-message-injector/
-├── package.json            # 插件身份证：dsh.bundle（激活）+ dsh.client（前端声明）+ exports["./client"]
+├── package.json            # 插件身份证：dsh.bundle（激活）+ dsh.client（前端声明）+ peerDependencies（dsh 0.2.x 版本门禁）
+├── bundle.patch.yml         # 激活补丁：insert id = 包名 = 0.2.0 settings 命名空间
+├── pnpm-workspace.yaml      # pnpm 配置（autoInstallPeers=false + allowBuilds）
 ├── src/                             # 按官方 half 分法：host（后端）/ client（前端）
 │   ├── host/
-│   │   └── index.ts            # 后端源码：Config schema + settings 接线 + validate
+│   │   ├── index.ts            # 后端源码：Config schema（.volatile()）+ 自绘配置页声明 + 旧数据导入
+│   │   └── node-stubs.d.ts     # node 内置模块最小类型桩
 │   ├── shared/
 │   │   └── types.ts            # 领域类型 PresetGroup/PresetConfig（两端共用，纯类型）
 │   └── client/                 # 前端源码（全部浏览器代码，构建为 lib/client.js）
 │       ├── index.tsx           # 前端入口（组合根：只做接线）
-│       ├── types/              # 契约类型（ScopeLike/InputLike/RootCtx 等防御式服务类型）
+│       ├── types/              # 契约类型（ScopeLike/ConfigFormLike/InputLike/RootCtx 等防御式服务类型）
 │       ├── api/                # 数据访问（skills.ts：技能目录接口 + 30s TTL 缓存）
 │       ├── services/           # 业务服务（injector.ts：自动注入轮询，F4/F5）
 │       ├── logic/              # 纯业务逻辑（normalizeContent/isSkillLine/skillNameOf/cloneGroup）
 │       ├── locales/            # 词典（zh/en）
-│       ├── utils/              # 通用工具（scroll/css/signal/settings）
+│       ├── utils/              # 通用工具（scroll/css/signal/session/navigation）
 │       ├── components/         # UI 组件（ConfigCard/PresetSelector/PresetConfigCard）
 │       └── ambient.d.ts        # 最小类型桩（react / primitives 由浏览器运行时提供）
 ├── scripts/build.mjs       # esbuild 构建（pnpm build）：后端 → lib/index.js，前端 → lib/client.js

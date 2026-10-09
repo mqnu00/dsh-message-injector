@@ -1,22 +1,23 @@
 /**
- * 预设组配置卡（settings.plugin.item，设置 → 插件 → 插件配置，F1）
+ * 预设组配置卡（plugins.bundle.config，Plugins 页 → 本插件 bundle 详情，F1）
  *
- * 形态与 dsh 官方配置卡（WebSearch/Bash/AgentLoop）同构：可折叠标题栏 + 表单体
- * + 放弃/保存脚注——复用通用组件 ConfigCard（见 components/ConfigCard.tsx）。
+ * dsh 0.2.0：旧「设置 → 插件 → 插件配置」（settings.plugin.item）已随官方设置面板
+ * 改版移除，本卡改挂 Plugins 页 bundle 详情槽；形态仍是官方配置卡同构：
+ * 可折叠标题栏 + 表单体 + 放弃/保存脚注——复用通用组件 ConfigCard。
  * 预设组块样式（psi-group*）随本组件 CSS 注入；字段样式类由 ConfigCard 提供。
  * 全部走 --dsw-alias-* 令牌；禁止引用 dsh 内部 CSS 类名（构建哈希，升级即断，见坑 7）。
  */
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import {
-  IconChevronDownOutline14,
-  IconChevronUpOutline14,
-  IconTrashOutline16,
+  IconChevronDownOutlineRegular,
+  IconChevronUpOutlineRegular,
+  IconTrashOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ConfigCard } from './ConfigCard'
 import type { ExpandSignal } from './ConfigCard'
 import { scrollElementIntoView } from '../utils/scroll'
 import { injectStyle } from '../utils/css'
-import type { ScopeLike } from '../types'
+import type { ConfigPathOp, ScopeLike } from '../types'
 import type { PresetConfig, PresetGroup } from '../../shared/types'
 import { cloneGroup, isSkillLine, normalizeContent, skillNameOf } from '../logic'
 
@@ -157,8 +158,10 @@ export function PresetConfigCard({ scope, fetchKnownSkillNames, t: tRaw, expandS
   }
   const contentError = (g: PresetGroup): string =>
     normalizeContent(g.content).length === 0 ? t('contentRequired') : ''
+  // 只读（如非本机页面：ConfigForm 的 memory 模式）→ 保存禁用
+  const readOnly = snap.status === 'ready' && snap.writable === false
   // 任一字段非法 → 保存禁用（官方 blocked 逻辑：!dirty || invalid || saving）
-  const invalid = draft.some((g, i) => nameError(g, i) !== '' || contentError(g) !== '')
+  const invalid = readOnly || draft.some((g, i) => nameError(g, i) !== '' || contentError(g) !== '')
 
   const save = async () => {
     setFailed('')
@@ -168,9 +171,17 @@ export function PresetConfigCard({ scope, fetchKnownSkillNames, t: tRaw, expandS
       content: normalizeContent(g.content),
       enabled: g.enabled,
     }))
+    // F6-6 自动反选（0.2.0 实现位置）：选中组被删除/禁用时，与 groups 同一次事务清掉 selected。
+    // 不在宿主 loader/volatile-update 里回写——该事件在 HMR 事务内触发，嵌套写必然被拒。
+    const selectedNow = snap.status === 'ready' ? snap.value?.selected ?? '' : ''
+    const keepSelected = selectedNow === '' || cleaned.some((g) => g.name === selectedNow && g.enabled)
+    const ops: ConfigPathOp[] = [{ op: 'set', path: ['groups'], value: cleaned }]
+    if (!keepSelected) ops.push({ op: 'set', path: ['selected'], value: '' })
     setSaving(true)
     try {
-      await scope.set('groups', cleaned)
+      // 0.2.0：mutate 返回宿主是否接受（false = 被拒绝/只读；传输错误才 reject）
+      const accepted = await scope.mutate(ops)
+      if (!accepted) throw new Error(t('notAccepted'))
       setDraft(cleaned.map(cloneGroup))
       setDirty(false)
     } catch (e) {
@@ -202,6 +213,7 @@ export function PresetConfigCard({ scope, fetchKnownSkillNames, t: tRaw, expandS
       <div className="psi-field psi-addRow">
         <button type="button" className="psi-add" onClick={addGroup}>+ {t('addGroup')}</button>
       </div>
+      {readOnly && <p className="psi-hint">{t('readOnly')}</p>}
       {draft.map((g, i) => {
         const nErr = nameError(g, i)
         const cErr = contentError(g)
@@ -224,7 +236,7 @@ export function PresetConfigCard({ scope, fetchKnownSkillNames, t: tRaw, expandS
                 <span className={'psi-groupName' + (g.name.trim() === '' ? ' psi-groupNameEmpty' : '')}>
                   {g.name.trim() || t('groupName')}
                 </span>
-                <IconChevronDownOutline14 className={'psi-groupChevron' + (isOpen ? ' psi-groupChevronOpen' : '')} />
+                <IconChevronDownOutlineRegular className={'psi-groupChevron' + (isOpen ? ' psi-groupChevronOpen' : '')} />
               </button>
               <label className="psi-checkLabel">
                 <input
@@ -236,13 +248,13 @@ export function PresetConfigCard({ scope, fetchKnownSkillNames, t: tRaw, expandS
                 {t('enabled')}
               </label>
               <button type="button" className="psi-iconBtn" title={t('moveUp')} disabled={i === 0} onClick={() => move(i, -1)}>
-                <IconChevronUpOutline14 />
+                <IconChevronUpOutlineRegular />
               </button>
               <button type="button" className="psi-iconBtn" title={t('moveDown')} disabled={i === draft.length - 1} onClick={() => move(i, 1)}>
-                <IconChevronDownOutline14 />
+                <IconChevronDownOutlineRegular />
               </button>
               <button type="button" className="psi-iconBtn" title={t('remove')} onClick={() => removeGroup(i)}>
-                <IconTrashOutline16 />
+                <IconTrashOutlineRegular />
               </button>
             </div>
             {isOpen && (

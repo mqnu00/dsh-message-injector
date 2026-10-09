@@ -13,12 +13,18 @@
 | 4 | cordis.yml 要写绝对路径 | `--patch` 本地加载天生如此 | 放弃 `--patch`，只走官方 `dsh plugin add/remove`；仓库不维护 cordis.yml |
 | 5 | `dsh plugin add` 显示成功但毫无变化 | 缺 `dsh.bundle` 声明，被当普通依赖装（安装输出有警告） | 三声明齐活：`dsh.bundle.patch` + `exports["./client"]` + 入口；装后查 bundles 列表 |
 | 6 | `ctx.logger?.info('loaded')` 静默无效 | cordis 4.x 的 `ctx.logger` 是服务工厂 | `ctx.logger('名字')` 拿实例，或直接用 `console.log` |
-| 7 | UI 渲染崩溃 `reading 'store'` of undefined | `useSyncExternalStore(scope.subscribe, scope.getSnapshot)` 裸传方法丢 this | 箭头函数包裹：`useSyncExternalStore((cb) => scope.subscribe(cb), () => scope.getSnapshot())` |
+| 7 | UI 渲染崩溃 `reading 'store'` of undefined | `useSyncExternalStore(scope.subscribe, scope.getSnapshot)` 裸传方法丢 this | 箭头函数包裹：`useSyncExternalStore((cb) => scope.subscribe(cb), () => scope.getSnapshot())`；getSnapshot 必须**直接透传稳定快照**（每次 new 一个对象会触发无限重渲染） |
 | 8 | 每条消息重复注入技能，token 滚雪球 | 技能是**会话级激活**的，重复注入无去重 | 技能调用行只注入一次；普通文本每条带没问题（定位转折点） |
 | 9 | git 事故三连 | `.pnpm-store`（33MB 缓存）被 add -A 误提交；amend 时 index 状态混乱 | `.gitignore` 加 `.pnpm-store/`；提交前 `git status`；soft reset 找回内容（不动工作区） |
 | 10 | 开源前发现绝对路径/真实姓名/邮箱在历史里 | 未做隐私审计 | 扫绝对路径/用户名/邮箱/IP；git 作者匿名化（noreply）；`reflog expire` + `gc --prune=now`；`git fsck` 验证 |
 | 11 | README 越写越长、术语混乱 | 文档组织无规划 | README 精简为门面页，细节拆 docs/zh + docs/en；术语统一"前端/后端" |
-| 12 | `require("@deepseek-ai/dsh-client-store")` 报 missed the module table | **基线版本错位**：该包在官方 master 的 PLATFORM_MODULES 基线里，但 npm 最新发布版（0.1.1-rc.2）没有 | 开发前先确认 harness 版本与官方支持面；未发布 → 用 settingsScope + uSES（坑 7 写法），等基线发布后切回 store 写法 |
+| 12 | `require("@deepseek-ai/dsh-client-store")` 报 missed the module table | **基线版本错位**：包在 master 基线里有，装的版本没有（0.1.1-rc.2 时期） | 开发前先确认 harness 版本与官方支持面；0.2.0 起 store 与 configForms 已随 web app 发布，可直接用 |
+| 13 | 0.2.0 上插件拖垮整个 web：宿主 `sctx.settings.register is not a function`、前端 `pending (waiting for service: settingsScope)`、页面停在 `Failed to load plugins` | 0.2.0 **settings 架构重构**：`installSettingsSection`/`settingsNamespace`/`settingsScope`/`settings.plugin.item` 全删，改为「Loader 条目 id 命名空间 + `.volatile()` 字段 + `configForms` + `plugins.bundle.config`」 | 按新版模型整体迁移（见 §3.3-3.5 与官方对照.md）；旧 helper 不能留"兼容分支"（0.2.0 上模块链接期就坏） |
+| 14 | 满屏 `Module "x" has no exported member ...`，连无关代码都报错 | 把 `declare module '真模块'` 写在了**没有 import/export 的 .d.ts**（全局脚本）里——它成了"环境模块声明"，直接遮蔽真模块的全部导出 | 模块增强必须写进**模块文件**（加 `import type {} from 'x'` 或 `export {}`）；给不存在类型的内置模块写桩则相反，放全局脚本 .d.ts |
+| 15 | `pnpm install` 卡死/超时，日志在拉整个 dsh（含几百 MB wasm 包） | pnpm 默认 `autoInstallPeers: true`，把 `peerDependencies` 里的 `@deepseek-ai/dsh` 真装下来 | `pnpm-workspace.yaml` 设 `autoInstallPeers: false`（与 dsh profile 一致）；peers 照留（启动门禁按它判断兼容性） |
+| 16 | `ctx.effect(() => service?.configure?.(...))` 编译报 `TS2769` | cordis 4 的 Effect 只接受 `Disposable | Iterable<Disposable>`，不接受 undefined | 回调统一 `return () => { d?.() }` |
+| 17 | 自动反选/自愈写配置静默失效（`.catch` 吞了 `HMR transactions cannot be nested`） | `loader/volatile-update` 在 HMR 写事务内**同步**触发，回调里再 `settings.update` → 嵌套 `runExclusive` 必被拒（ALS 上下文还会随异步资源传播，延后也逃不掉） | 回写放在**写入方**：把相关字段放进**同一次 `form.mutate([...])`** 原子提交；消费侧对失效数据加守卫。**任何"配置变更后再改配置"的侦听器都要先问：是不是在写事务里？** |
+| 18 | 槽位组件渲染即崩：“Element type is invalid” | 0.2.0 primitives 图标名换代：`Icon*OutlineRegular/Medium`（旧的 `Icon*Outline14/16` 全部不存在；拿 `any` 类型桩时 tsc 也查不出） | 升级时先核对真包导出清单（`grep -o "Icon[A-Za-z0-9]*" node_modules/@deepseek-ai/dsh-client-ui-primitives/lib/index.js \| sort -u`），或直接加 primitives 的 devDependency 用真类型 |
 
 ## 2. 术语表
 
@@ -27,76 +33,101 @@
 | host half / client half | dsh 官方叫法，即**后端 / 前端**（本项目文档统一用后者） |
 | bundle（组合包） | 附带一个配置层的 npm 包，manifest 声明 `dsh.bundle`，回答"这个包贡献什么" |
 | profile | `$DSH_HOME/profiles/<name>` 下的可启动组合目录，manifest 声明 `dsh.profile.bundles` |
-| `dsh.bundle.patch` | package.json 里指向 patch 文件（如 `cordis.patch.yml`）的字段，安装时挂载为 profile 层 |
+| `dsh.bundle.patch` | package.json 里指向 patch 文件的字段，安装时挂载为 profile 层；**patch 里 insert 的 id = 0.2.0 settings 命名空间** |
 | `exports["./client"]` | 前端产物约定子路径，dsh 找浏览器代码就认它（`lib/client.js`） |
-| `dsh.client.inject` | package.json 里声明的浏览器侧依赖服务列表（slots/locale/settingsScope…） |
+| `dsh.client.inject` | package.json 里的**包名清单**（informational，影响客户端模块到达顺序），**不是** Cordis 服务注入 |
 | `dsh.client.platform` | 客户端声明，取 `"web"` |
-| PLATFORM_MODULES | shell 冻结模块表（react、cordis、ui-primitives、dsh-client-store…），插件 bundle 的 external 引用从这里解析 |
-| `apply(ctx)` | 插件启动函数；通过 `ctx` 注册的资源卸载时自动清理 |
-| `inject` | 依赖服务声明，框架保证就绪后才加载插件 |
-| `ctx.effect()` | 手动资源（定时器、订阅）注册，卸载时执行返回的清理函数 |
-| settingsNamespace / installSettingsSection | dsh-settings 官方导出：命名空间 + 配置接线（schema、校验、持久化） |
-| settingsScope | 浏览器侧 settings 服务，`bind({namespace})` 返回 `{getSnapshot, subscribe, set}` 裸数据源 |
-| hooks 口子 | slot 注册 inject face 里的 `hooks: { name: 裸数据源 }`，渲染器绑成 `use<Name>()` 钩子（官方家规：业务组件零手写订阅） |
+| PLATFORM_MODULES | shell 冻结模块表（react、cordis、ui-primitives…），插件 bundle 的 external 引用从这里解析 |
+| `apply(ctx, config)` | 插件启动函数；导出 `Config`（schemastery）时第二参收到解析后的配置（`.volatile()` 字段为 `Volatile` 引用，用 `.get()` 读） |
+| `inject` | 运行时依赖服务声明（前端代码里的 `export const inject = [...]`），框架保证就绪后才加载插件 |
+| `ctx.effect()` | 手动资源（定时器、订阅）注册，卸载时执行返回的清理函数；**回调必须返回 disposer** |
+| volatile 字段 | 0.2.0 配置模型里对 `Config` 字段的 `.volatile()` 声明——只有 volatile 字段会出现在设置表单/可被写入 |
+| `loader/volatile-update` | 0.2.0 配置变更事件（按 fiber 派发，只发给条目自身），用于响应配置热更新 |
+| ConfigForm / `ctx.configForms` | 0.2.0 浏览器侧配置读写门面：`get(条目id)` → `{getSnapshot, subscribe, set, unset, mutate}`；`set` resolve false = 拒绝/只读 |
+| `plugins.bundle.config` 等槽 | 0.2.0 插件管理的 UI 槽（Plugins 页）：bundle 详情 / 行详情 / 列表卡片；旧 `settings.plugin.item` 已删 |
 | `__ModuleLoader__.load` | 前端 bundle 的浏览器端标准包装形态 |
 | `--dump-config` | 官方离线验证命令：`dsh --profile <name> --dump-config` 打印各层配置 |
 
 ## 3. 关键代码片段
 
-### 3.1 settingsScope 读取（无 store 基线时的验证写法，坑 7/12）
+### 3.1 配置读取（0.2.0：ConfigForm → useSyncExternalStore）
 
 ```tsx
-// 必须箭头函数包裹，否则 useSyncExternalStore 调用时丢失 this（scope 方法依赖 this.store）
+// 入口接线：const form = ctx.configForms.get<PresetConfig>(条目id)（条目id = patch 里的 id = 包名）
+// 组件里：必须箭头函数包裹（丢 this），getSnapshot 直接透传稳定快照（重建对象 = 无限重渲染）
 const snap = useSyncExternalStore(
   (listener: () => void) => scope.subscribe(listener),
   () => scope.getSnapshot(),
 )
 const config = snap.status === 'ready' ? snap.value : undefined
+// 写入：set 返回 boolean（false = 宿主拒绝/只读；传输错误才 reject）
+const accepted = await scope.set('groups', next)
 ```
 
-### 3.2 settingsScope 读取（store 基线就绪后的官方家规写法）
+### 3.2 显示配置卡（0.2.0：plugins.bundle.config 槽）
 
 ```tsx
-// ① createSnapshotStore 来自 @deepseek-ai/dsh-client-store（PLATFORM_MODULES 基线，构建时 external）
-// ② apply 内：const store = createSnapshotStore<T>(初始值)；订阅 scope 同步 store
-// ③ slots.register 的 inject face：hooks: { presetConfig: store } + 纯回调 actions
-// ④ 组件 props 收到 usePresetConfig(selector) 钩子，直接读；渲染器是唯一 uSES 桥梁
-// 参考实现：dsh-message-injector 官方对照.md 与 dsh-client-ui-settings-plugins（官方第一方）
+// key = 包名；宿主服务该命名空间后才注册（whileServed 门控，避免空卡）
+ctx.effect(() => ctx.configForms.whileServed([NS], () => ctx.slots.inject('plugins.bundle.config', () =>
+  ctx.slots.register({ name: 'plugins.bundle.config', key: NS, locale: NS, inject: () => ({ scope }) }, Card),
+)), 'label')
 ```
 
-### 3.3 后端 settings 接线（官方 installSettingsSection）
+### 3.3 后端配置声明与变更（0.2.0：volatile 模型）
 
 ```ts
 import z from '@deepseek-ai/schemastery'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 
-export const NS = settingsNamespace('my-plugin')
-export const Config = z.object({ /* schema */ })
+export const Config = z.object({
+  groups: z.array(groupSchema).default([]).volatile(),
+  selected: z.string().default('').volatile(),
+})
 
-export function apply(ctx: Context) {
-  installSettingsSection(ctx, NS, Config, 默认值, {
-    setSource(current) { /* 保存 live source */ },
-    onChange() { /* 外部变化 */ },
-    validate(value) { /* 硬校验，throw 即拒绝写入 */ },
+export function apply(ctx: Context, config: { groups: Volatile<Group[]>; selected: Volatile<string> }) {
+  ctx.on('loader/volatile-update', () => { /* 配置已提交，此时 .get() 读到新值 */ })
+  ctx.inject(['settings'], (sctx) => {
+    // 自绘配置页（否则官方会在 Plugins 页自动生成一份表单）
+    sctx.effect(() => {
+      const d = sctx.get('settings')?.configure?.({ auto: false }, ctx.fiber)
+      return () => { d?.() }
+    }, 'label')
   })
 }
 ```
 
-### 3.4 构建要点（build.mjs）
+### 3.4 取本条目 id 与旧数据导入（0.2.0）
 
-- 后端：esbuild `format: 'esm'`，`@deepseek-ai/schemastery`、`@deepseek-ai/dsh-settings` 保持 external。
-- 前端：esbuild `format: 'cjs'` + `jsx: 'automatic'`，external：`react`、`react/jsx-runtime`、`@deepseek-ai/dsh-client-ui-primitives`（及基线就绪后的 `@deepseek-ai/dsh-client-store`）；产物包一层 `window.__ModuleLoader__.load({id, factory})`。
+```ts
+// 条目 id：优先 ctx.fiber.entry?.options.id；兜底遍历 ctx.loader.entries() 按包名反查（见 dsh-better-sidebar）
+// 旧数据（0.1.x 的 $DSH_HOME/settings.yaml 命名空间抽屉）：0.2.0 启动时被改名 settings.yaml.imported，
+// 官方只迁移内建段落；插件自建一次性导入（仅在条目 user 层为空时写，绝不覆盖新配置）：
+const row = settings.describe().find((c) => c.ns === entryId)
+if (!row.user || Object.keys(row.user).length === 0) await settings.update(entryId, legacySection)
+```
+
+### 3.5 「打开我的配置页」导航（0.2.0）
+
+```ts
+// 官方导航服务：切 Plugins 面板 + 打开本包详情（配置卡就在详情页）
+ctx.get('pluginNavigation')?.openBundle?.(包名)
+// 降级：ctx.get('layout')?.selectPanel?.('plugins')（只到列表）→ DOM 兜底 li[data-plugin-package]
+```
+
+### 3.6 构建要点（build.mjs）
+
+- 后端：esbuild `format: 'esm'`，`@deepseek-ai/schemastery`（及 `yaml` 等纯 JS 依赖）保持 external。
+- 前端：esbuild `format: 'cjs'` + `jsx: 'automatic'`，external：`react`、`react/jsx-runtime`、`@deepseek-ai/dsh-client-ui-primitives`；产物包一层 `window.__ModuleLoader__.load({id, factory})`。
 
 ## 4. FAQ
 
-**Q：插件怎么工作的？** 后端管配置（schema/校验/持久化），前端管 UI（槽位组件）；两端通过官方服务（settingsScope 等）通信。改代码：只改前端刷新浏览器；改后端或不确定就重启 dsh（后端模块启动时读进内存，不重载）。
+**Q：插件怎么工作的？** 后端管配置（`Config` schema + volatile 字段 + 持久化投影），前端管 UI（槽位组件）；两端通过官方服务通信（配置走 `configForms`/settings RPC，技能目录走 `remote.skills` 等）。改代码：只改前端刷新浏览器；改后端或不确定就重启 dsh（后端模块启动时读进内存，不重载）。
 
 **Q：为什么不能直接改输入框 DOM？** 输入框是 React 受控组件，直接改 DOM 不同步 React 状态；必须走官方通道（如 `input.setDraft(text)`，一次事务可撤销）。
 
-**Q：本地安装和 GitHub 安装区别？** 本地路径 = 软链接（改代码 build + 重启即生效）；GitHub = 克隆副本（拉的是源码，需 `prepare` 脚本 + pnpm `allowBuilds` 授权，且建议锁定 commit；或发布 npm / 交付 `pnpm pack` tarball 免构建权限）。详见官方对照.md。
+**Q：本地安装和 GitHub 安装区别？** 本地路径 = 软链接（改代码 build + 重启即生效）；GitHub = 克隆副本（拉的是源码，如含构建步骤需 `prepare` 脚本 + pnpm `allowBuilds` 授权，且建议锁定 commit；或发布 npm / 交付 `pnpm pack` tarball 免构建权限）。详见官方对照.md。
 
 **Q：为什么不用 `--patch`？** 它要绝对路径（开源泄露隐私）。`--patch` 是官方教程的开发 overlay，`dsh plugin add` 是官方安装路径，本项目统一后者。
 
-**Q：settings 存哪？** `$DSH_HOME/settings.yaml` 的命名空间抽屉，跨会话/刷新/标签页保持。
+**Q：dsh 0.2.0 的 settings 存哪？** 存 profile 补丁 `$DSH_HOME/profiles/<profile>/cordis.patch.yml` 的「条目 id」段落（由官方 settings 服务与 config-editor 写入），不再是 `$DSH_HOME/settings.yaml`（旧文件会被改名 `settings.yaml.imported`）。
 
-**Q：这些经验对新插件最值钱的是？** 先确认机制再定产品、最小回路先行、三声明缺一不可、开发前确认 harness 版本与官方支持面、测试走官方路径由用户执行、产物提交、开源前隐私审计。
+**Q：这些经验对新插件最值钱的是？** 先确认机制再定产品、最小回路先行、三声明缺一不可、开发前确认 harness 版本与官方支持面、**大版本升级先看官方发布说明 + 拿已适配插件当参照**、测试走官方路径由用户执行、产物提交、开源前隐私审计。

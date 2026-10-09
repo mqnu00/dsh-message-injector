@@ -4,11 +4,13 @@
 
 dsh（DeepSeek Harness）插件：预设常用"消息注入内容"组合（任意文本 / 技能调用），**每条消息自动注入**到输入框首行，一键启用、切换、停止——不需要每条消息手动输入固定的指令前缀或格式要求。
 
+> 版本对应：**本版本（v0.2.x）适配 dsh 0.2.0**（插件管理入口随官方改版移动到侧边栏「插件」页）；dsh 0.1.x 用户请安装 [v0.1.0](https://github.com/wf-ping/dsh-message-injector/releases/tag/v0.1.0)。
+
 ## 功能
 
-- **预设组管理**：设置 → 插件 → 插件配置 中增删改查、启用/禁用、组排序、组折叠；官方同款配置卡外观
+- **预设组管理**：侧边栏「插件（Plugins）」页 → 本插件详情 中增删改查、启用/禁用、组排序、组折叠；官方同款配置卡外观
 - **一键选择**：输入框左下角的「预设」选择器，点击选中，再点反选
-- **设置直达**：选择器菜单底部「设置」，一键打开设置面板并展开本插件配置
+- **设置直达**：选择器菜单底部「设置」，一键打开本插件配置页并展开配置卡
 - **自动注入**：空输入框 ~500ms 自动注入内容（如 `/grill-me /domain-modeling ` 或 "请用中文回答"）
 - **技能校验**：以 `/` 开头的内容视为技能调用，缺失时配置卡警告、注入时跳过
 - **智能守卫**：输入框已有内容时不注入，绝不打扰已有内容
@@ -16,13 +18,15 @@ dsh（DeepSeek Harness）插件：预设常用"消息注入内容"组合（任�
 
 ## 配置存储位置
 
-预设组与选中状态保存在 dsh 全局配置文件：**`$DSH_HOME/settings.yaml`**（默认 `~/.dsh/settings.yaml`），命名空间 `message-injector`（含 `groups` + `selected`）。跨会话、跨刷新、跨标签页保持；备份/迁移 = 复制该文件（或其中 `message-injector:` 片段）。**请通过插件界面增删改**，不要手改文件（绕过界面可能破坏格式或校验）。
+预设组与选中状态保存在插件所在的 profile 配置补丁中：**`$DSH_HOME/profiles/<profile>/cordis.patch.yml`**（默认 web profile 即 `~/.dsh/profiles/web/cordis.patch.yml`），条目 `dsh-message-injector`（含 `groups` + `selected`）。跨会话、跨刷新、跨标签页保持；备份/迁移 = 复制该文件（或其中 `dsh-message-injector:` 片段）。**请通过插件界面增删改**，不要手改文件（绕过界面可能破坏格式或校验）。
+
+> 从 0.1.x 升级：旧数据（`$DSH_HOME/settings.yaml` 的 `message-injector` 段落）由插件在首次启动时自动导入（仅在尚未配置时执行一次）。
 
 ## 快速安装
 
 ```bash
-dsh plugin --profile web add github:wf-ping/dsh-message-injector        # 从 GitHub 安装（默认 = 最新，跟随 main）
-dsh plugin --profile web add github:wf-ping/dsh-message-injector#v0.1.0  # 固定版本安装（可选）
+dsh plugin --profile web add github:wf-ping/dsh-message-injector          # 从 GitHub 安装（默认 = 最新，跟随 main）
+dsh plugin --profile web add github:wf-ping/dsh-message-injector#v0.2.0  # 固定版本安装（可选）
 dsh plugin --profile web add <本仓库路径>                # 本地/开发时安装
 ```
 

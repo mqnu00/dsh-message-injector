@@ -20,9 +20,9 @@ description: 指导从零开发一个 deepseek-harness (dsh) 插件：先确认�
 ### 1. 先确认核心机制、harness 版本、官方支持面，再定产品形态
 
 - 机制：确认"这个功能在 dsh 里到底怎么生效"。**一个事实可能推翻整个定位**——例：技能是会话级激活的，做成"每条消息重复注入技能"会烧 token，定位必须改。
-- 版本：查 harness 版本（npm `@deepseek-ai/dsh` 的 dist-tags；本机 `node_modules/@deepseek-ai/dsh/package.json`）。
-- 支持面：确认要用到的 API/基线包在**当前发布版本**里是否存在。例：`@deepseek-ai/dsh-client-store`（PLATFORM_MODULES 基线种子）目前只在官方 master 分支，npm 最新版 0.1.1-rc.2 没有——**官方 master 有 ≠ 你装的有**。
-- 没有官方支持 → 用本项目验证过的等价写法（见 REFERENCE.md 坑 12），并在文档注明"待基线发布后切换"。
+- 版本：查 harness 版本（npm `@deepseek-ai/dsh` 的 dist-tags；本机 `node_modules/@deepseek-ai/dsh/package.json`）。**大版本升级看官方发布说明 + 拿已适配的同生态插件当参照**（例：0.2.0 迁移时参照 dsh-better-sidebar / dsh-llm-retry-settings，比扫官方源码快得多）。
+- 支持面：确认要用到的 API/基线包在**当前发布版本**里是否存在。例：`@deepseek-ai/dsh-client-store` 在 0.1.1-rc.2 尚未进基线——**官方 master 有 ≠ 你装的有**；settings API 在 0.2.0 整体换血（见 REFERENCE.md 坑 13）。
+- 没有官方支持 → 用本项目验证过的等价写法（见 REFERENCE.md），并在文档注明"待基线发布后切换"。
 - 产出：机制 + 版本 + 支持面三段结论，写进需求文档。
 
 ### 2. 最小回路（hello world 先跑通）
@@ -33,8 +33,8 @@ description: 指导从零开发一个 deepseek-harness (dsh) 插件：先确认�
 
 ### 3. 三份声明齐活（缺一个都"装了不生效"）
 
-- `package.json`：`dsh.bundle.patch`（指向 `cordis.patch.yml`）+ `exports["./client"]`（前端入口）+ `main`/`exports["."]`（后端入口）。
-- `cordis.patch.yml`：`- insert: {id, name: 包名}`——**只用包名**（Node 模块解析），不用绝对路径。
+- `package.json`：`dsh.bundle.patch`（指向 patch 文件）+ `exports["./client"]`（前端入口）+ `main`/`exports["."]`（后端入口）；建议加 `peerDependencies`（`@deepseek-ai/dsh`）声明兼容范围——dsh 启动时的版本门禁按它判断。
+- patch 文件：`- insert: {id, name: 包名}`——**只用包名**（Node 模块解析），不用绝对路径。**id 即 0.2.0 的 settings 命名空间**，起名后就别再改。
 - 装完检查：profile 的 bundles 列表有插件名；或 `dsh --profile <name> --dump-config` 看到本插件层。
 
 ### 4. 构建（esbuild 双产物）
@@ -48,11 +48,13 @@ description: 指导从零开发一个 deepseek-harness (dsh) 插件：先确认�
 
 - `src/host/index.ts` → `lib/index.js`（后端 ESM，依赖保持外部解析）。
 - `src/client/index.tsx` → `lib/client.js`（前端，`window.__ModuleLoader__.load` 包装形态；react、primitives 等运行时依赖 external，由 shell 模块表提供）。**JSX 必须写在 `.tsx` 文件**（`.ts` 不解析 JSX）。
+- 本地 `pnpm install` 要关 `autoInstallPeers`（`pnpm-workspace.yaml`），否则 peer 里的 `@deepseek-ai/dsh` 会被整车拉下来（坑 15）。
 
-### 5. 功能开发与迭代
+### 5. 功能开发与迭代（dsh 0.2.0 API）
 
-- 后端：Config schema（schemastery）+ settings 接线（`installSettingsSection`/`settingsNamespace`）；改后端必须重启 dsh。
-- 前端：UI 走 `ctx.slots.register`（槽位名见官方运行时，如 `conversation.input.left`、`settings.plugin.item`）；读数据用 settingsScope，**先按步骤 1 确认基线**：支持 store 基线 → `createSnapshotStore` + inject face 的 `hooks` 口子（渲染器绑成 `use<Name>()` 钩子，官方家规）；不支持 → `useSyncExternalStore` + **箭头函数包裹**（裸传方法丢 this 会渲染崩溃，坑 7）；写数据一律 `scope.set`（经后端校验与持久化）。
+- 后端：导出 `Config`（schemastery；参与配置卡/持久化的字段必须 `.volatile()`）+ `apply(ctx, config)` 里 `config.<字段>.get()` 读实时值；变更监听 `ctx.on('loader/volatile-update')`；自绘配置页时 `ctx.inject(['settings'], s => s.effect(() => s.settings.configure({ auto: false }, ctx.fiber)))`；写入 `ctx.get('settings')?.update(条目id, patch)`。改后端必须重启 dsh。
+- 前端：UI 走 `ctx.slots.register`（槽位名见官方运行时，如 `conversation.input.left`、`plugins.bundle.config`）；读配置 `ctx.configForms.get(条目id)`（ConfigForm：稳定快照 + subscribe + set/mutate）；渲染订阅**必须箭头函数包裹**且 getSnapshot 直接透传稳定快照（裸传/重建对象都会翻车，坑 7）；写数据一律 `form.set/mutate`（返回 boolean：false = 被拒绝/只读）。
+- `dsh.client.inject`（package.json）是**包名**清单（提示模块加载顺序），**不是** Cordis 服务名；运行时服务依赖写在前端代码 `export const inject = [...]` 里。
 - 只改前端 → 刷新浏览器；改后端或不确定 → 重启。
 
 ### 6. 文档与改名同步

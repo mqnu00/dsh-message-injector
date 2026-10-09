@@ -3,8 +3,8 @@
  * - react / react/jsx-runtime：浏览器运行时由 dsh web shell 提供，这里只做类型声明
  * - @deepseek-ai/dsh-client-ui-primitives：内置于 web shell 的 staticModules，
  *   磁盘上不存在（profile node_modules 中无此包），运行时由浏览器模块加载器提供
- * - 基线就绪后（见 SKILL.md 步骤 1）还需声明 @deepseek-ai/dsh-client-store
- *   （createSnapshotStore / SnapshotStore<T>），参考官方仓库 packages/client/store
+ * - 给真模块补声明（模块增强）必须写在本文件这类「模块」里；
+ *   给 node 内置模块写桩则放无 import/export 的全局 .d.ts（坑 14）
  */
 
 declare module 'react' {
@@ -26,7 +26,8 @@ declare module 'react/jsx-runtime' {
 
 declare module '@deepseek-ai/dsh-client-ui-primitives' {
   export const Menu: any
-  export const IconChevronDownOutline14: any
+  /** 0.2.0 图标命名：名称 + Outline + Regular/Medium（旧的 *Outline14/16 不存在——坑 18） */
+  export const IconChevronDownOutlineRegular: any
 }
 
 declare namespace JSX {

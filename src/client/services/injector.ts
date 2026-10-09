@@ -7,10 +7,12 @@ import type { InputLike, RootCtx, ScopeLike } from '../types'
 import type { PresetConfig } from '../../shared/types'
 import { isSkillLine, normalizeContent, skillNameOf } from '../logic'
 import { fetchKnownSkillNames } from '../api/skills'
+import { currentSessionId } from '../utils/session'
 
 /** 启动 500ms 自动注入轮询；返回停止函数 */
 export function startAutoInject(ctx: RootCtx, scope: ScopeLike<PresetConfig>): () => void {
-  const timer = setInterval(() => { void tick(ctx, scope) }, 500)
+  // tick 全程静默容错：会话关闭/输入框销毁等竞态不让轮询抛未处理 rejection
+  const timer = setInterval(() => { tick(ctx, scope).catch(() => {}) }, 500)
   return () => clearInterval(timer)
 }
 
@@ -22,7 +24,7 @@ async function tick(ctx: RootCtx, scope: ScopeLike<PresetConfig>) {
   const group = groups.find((g) => g.name === selected)
   if (!group || !group.enabled) return
 
-  const sessionId = ctx.sessions.list.getSnapshot().current
+  const sessionId = currentSessionId(ctx)
   if (!sessionId) return
   const actx = ctx.sessions.scope(sessionId)
   if (!actx) return
@@ -34,10 +36,11 @@ async function tick(ctx: RootCtx, scope: ScopeLike<PresetConfig>) {
   if (s.phase !== 'plain') return
   // 守卫 2：输入框去掉空白后非空 → 不注入（保护已有内容）
   if (s.draft.trim() !== '') return
-  // 守卫 3：IME 组合期间 textarea.value 含未提交文本而 state.draft 为空 → 跳过
+  // 守卫 3：IME 组合期间编辑区含未提交文本而 state.draft 为空 → 跳过
+  // （0.2.0 输入框是 Lexical contenteditable，不是 textarea）
   if (typeof document !== 'undefined') {
-    const ta = document.querySelector<HTMLTextAreaElement>('[data-input-scroll] textarea')
-    if (ta && ta.value.trim() !== '') return
+    const editor = document.querySelector<HTMLElement>('[data-input-scroll] [contenteditable="true"]')
+    if (editor && (editor.textContent ?? '').trim() !== '') return
   }
 
   let lines = normalizeContent(group.content)

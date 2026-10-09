@@ -2,14 +2,16 @@
 
 ## Configure preset groups
 
-Settings → Plugins → Plugin Config → find the **「Message Injector」** card (collapsible — click the header bar to expand/collapse):
+Sidebar **Plugins** page → find the `dsh-message-injector` card → open its detail page → find the **「Message Injector」** card (collapsible — click the header bar to expand/collapse):
 
 1. Click **「+ Add preset group」**: the new group is inserted **at the first position** and auto-expanded (scrolled into view)
 2. Fill in the name (required, unique), description (optional), and content (one line per row: skill invocations carry a leading `/`, e.g. `/grill-me`; or plain text such as "Please answer in Chinese")
 3. Groups are collapsed by default (name only); click a group name to expand it for editing. The **enabled** toggle, move up/down, and delete live in the group header row and work while collapsed
 4. Click **Save** (name must be unique, at least one content line; `/`-prefixed lines whose skill does not exist are marked with ⚠️ and skipped when injecting) or **Discard**
 
-> Quick entry: the 「Preset」 menu at the bottom-left of the composer has a **「Settings」** item — one click opens the settings panel, switches to the Plugins section, and auto-expands the config card scrolled into view (if the auto-switch fails, switch manually and the card still expands by itself).
+> Quick entry: the 「Preset」 menu at the bottom-left of the composer has a **「Settings」** item — one click opens this plugin's page on the Plugins page and auto-expands the config card scrolled into view (if the jump fails, navigate there manually and the card still expands by itself).
+>
+> Since dsh 0.2.0 the official plugin config lives on the sidebar **Plugins** page (previously Settings → Plugins); 0.1.x keeps the old location.
 
 ## Select / deselect
 
@@ -34,7 +36,7 @@ Settings → Plugins → Plugin Config → find the **「Message Injector」** c
 
 ## Typical workflow
 
-1. **Configure**: Settings → Plugins → Plugin Config → **「+ Add preset group」** (the new group is inserted **at the first position** and auto-expanded) → fill in name/description/content (one per line) → **Save** (or Discard)
+1. **Configure**: sidebar Plugins page → this plugin's detail → **「+ Add preset group」** (the new group is inserted **at the first position** and auto-expanded) → fill in name/description/content (one per line) → **Save** (or Discard)
 2. **Select**: click the **「Preset」** button at the bottom-left of the composer → pick a group (**clicking the current group again = deselect**, stopping injection)
 3. **In effect**: an empty input box gets the content injected within ~500ms; edit freely before sending; after sending the box clears and **every message repeats automatically**
 4. **Maintain**: groups are collapsed by default (name only) — click to expand for editing; enable/disable, move up/down, and delete live in the group header row; the **「Settings」** item at the bottom of the selector menu jumps straight to the config
@@ -44,3 +46,4 @@ Settings → Plugins → Plugin Config → find the **「Message Injector」** c
 - If you manually clear the input box, the content is re-injected within ~500ms — this is by design (deselect first if you want to send plain text), not a bug
 - The missing-skill marker depends on an active session; without one the card shows no ⚠️, but missing skill invocations are still skipped when injecting
 - No injecting during IME composition (e.g. Chinese input) or while a message is being submitted (guard)
+- When the page is not accessed from the local machine (e.g. dsh web opened over LAN), the config card is read-only (an official limitation; the page shows a hint) — selection and auto-inject still work

@@ -7,9 +7,9 @@
 import { useState, useSyncExternalStore } from 'react'
 import {
   Menu,
-  IconSkillOutline16,
-  IconChevronDownOutline14,
-  IconSettingsOutline16,
+  IconSkillOutlineRegular,
+  IconChevronDownOutlineRegular,
+  IconSettingsOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { injectStyle } from '../utils/css'
 import type { ScopeLike } from '../types'
@@ -63,9 +63,9 @@ export function PresetSelector({ scope, t: tRaw, onOpenSettings }: SelectorProps
     if (id === '__none__') return
     if (id === selected) {
       // 反选：再次点击当前选中项 → 取消选择，确保不再注入
-      void scope.set('selected', '')
+      void scope.set('selected', '').catch(() => {})
     } else {
-      void scope.set('selected', id)
+      void scope.set('selected', id).catch(() => {})
     }
   }
 
@@ -77,7 +77,8 @@ export function PresetSelector({ scope, t: tRaw, onOpenSettings }: SelectorProps
       onSelect={choose}
       onClose={() => setOpen(false)}
       side="top"
-      footer={[{ id: '__settings__', label: t('openSettings'), icon: <IconSettingsOutline16 /> }]}
+      portal
+      footer={[{ id: '__settings__', label: t('openSettings'), icon: <IconSettingsOutlineRegular /> }]}
       anchor={(
         <button
           type="button"
@@ -86,9 +87,9 @@ export function PresetSelector({ scope, t: tRaw, onOpenSettings }: SelectorProps
           title={current?.description || t('selectPreset')}
           onClick={() => setOpen(!open)}
         >
-          <IconSkillOutline16 />
+          <IconSkillOutlineRegular />
           <span>{current ? current.name : t('preset')}</span>
-          <IconChevronDownOutline14 className={'psi-chevron' + (open ? ' psi-chevron-open' : '')} />
+          <IconChevronDownOutlineRegular className={'psi-chevron' + (open ? ' psi-chevron-open' : '')} />
         </button>
       )}
     />

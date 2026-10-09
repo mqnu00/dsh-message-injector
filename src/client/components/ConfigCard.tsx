@@ -1,8 +1,9 @@
 /**
  * 配置卡通用组件（Config Card）
  *
- * 复刻 dsh 官方配置卡壳（设置 → 插件 → 插件配置 中 WebSearch/Bash/AgentLoop 同款）：
+ * 复刻 dsh 官方配置卡壳（WebSearch/Bash/AgentLoop 同款）：
  * 可折叠标题栏（名称 + 描述 + 未保存徽标）+ 表单体（children）+ 放弃/保存脚注。
+ * dsh 0.2.0 起官方配置卡位于 Plugins 页 bundle/行详情（plugins.bundle.config 等槽）；
  * 任何插件配置界面接入它即可获得与官方一致的观感与交互：
  *   - 视觉参数照抄官方（radius 12 / border l2 / bg layer-3 / input 34px），
  *     全部走 --dsw-alias-* 令牌 + 自有类名（禁止引用 dsh 内部 CSS 类名，构建哈希升级即断）；
@@ -12,7 +13,7 @@
  *   - 展开后可选择自动滚动露出（useReveal，默认开启；手动开合不滚动）。
  */
 import { useEffect, useState } from 'react'
-import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronDownOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useReveal } from '../utils/scroll'
 import { injectStyle } from '../utils/css'
 
@@ -158,7 +159,7 @@ export function ConfigCard(props: ConfigCardProps) {
   }, [autoReveal])
 
   return (
-    <li ref={shellRef} className={'psi-shell' + (open ? ' psi-shellOpen' : '')}>
+    <div ref={shellRef} className={'psi-shell' + (open ? ' psi-shellOpen' : '')}>
       <button
         type="button"
         className="psi-shellHeader"
@@ -171,7 +172,7 @@ export function ConfigCard(props: ConfigCardProps) {
           <span className="psi-shellDesc">{description}</span>
         </span>
         {dirty && <span className="psi-shellPending">{t('unsaved')}</span>}
-        <IconChevronDownOutline14 className={'psi-shellChevron' + (open ? ' psi-shellChevronOpen' : '')} />
+        <IconChevronDownOutlineRegular className={'psi-shellChevron' + (open ? ' psi-shellChevronOpen' : '')} />
       </button>
       {open && (
         <div className="psi-shellBody">
@@ -187,6 +188,6 @@ export function ConfigCard(props: ConfigCardProps) {
           </div>
         </div>
       )}
-    </li>
+    </div>
   )
 }

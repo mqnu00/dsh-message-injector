@@ -1,0 +1,8 @@
+# 与 dsh profile 一致：peerDependencies 由运行时提供，不自动安装
+# （否则 pnpm 会把 @deepseek-ai/dsh 整车拉下来 —— 坑 15）
+packages:
+  - .
+
+autoInstallPeers: false
+allowBuilds:
+  esbuild: true
